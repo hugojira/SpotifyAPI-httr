@@ -29,17 +29,21 @@ bearer.token <- paste(token$token_type, token$access_token)
 # ---------- POST request to retrieve audio features of 1-track -----------
 
 # get features of just  1-track by its Spotify_ID (Santana - Oye Como Va)
-one.track.features <- GET("https://api.spotify.com/v1/audio-features/5u6y4u5EgDv0peILf60H5t",
+
+track.id <- "5u6y4u5EgDv0peILf60H5t"
+track.response <- GET(paste0("https://api.spotify.com/v1/audio-features/",track.id),
                config = add_headers(Authorization = bearer.token)
 )
 
-track.tidy <- as_tibble(content( one.track.features ))
-track.tidy %>% select(c(1:11, 17, 18))
+track <- as_tibble(content( track.response ))
+track.features <- track %>% select(c(1:11, 17, 18))
 
-# ---------- POST request to retrieve audio features from an album's tracks -----------
+# ---------- POST request to retrieve audio features from a album -----------
  
 # first, get the tracks info for an album
 # Nevermind ID: 2guirTSEqLizK7j9i1MTTZ
+# MTV Unplugged In New York ID : 1To7kv722A8SpZF789MZy7
+
 
 album.id <- "2guirTSEqLizK7j9i1MTTZ"
 album.response <-  GET(paste0("https://api.spotify.com/v1/albums/", album.id, "/tracks"),
@@ -60,25 +64,30 @@ album.songs.ids <- cbind( as.character(filter.ids) )
 # audio features for the tracks of the album
 
 # retrieve features to a list
-album.features <- lapply(1:length(album.songs.ids), function(n) {
-  GET(url = paste0("https://api.spotify.com/v1/audio-features/", album.songs.ids[n]),
+album.features <- lapply(1:length(album.songs.ids), function(i) {
+  GET(url = paste0("https://api.spotify.com/v1/audio-features/", album.songs.ids[i]),
       config = add_headers(authorization = bearer.token))
 }
 )
 
 # get the content of every element in the response list
-album.features.content <- sapply(1:length(album.songs.ids), function(n) {
-  content(album.features[[n]])
+album.features.content <- sapply(1:length(album.songs.ids), function(i) {
+  content(album.features[[i]])
 }
 )
 
 # convert lists to tibble and then unlist every column
 songs.tidy <- as_tibble(t(album.features.content))
 for (i in 1:length(songs.tidy)) {
-  songs.tidy[,i] <- unlist( select(.data = songs.tidy, i), use.names = FALSE )
+  songs.tidy[,i] <- format (unlist( select(.data = songs.tidy, i), use.names = FALSE ),
+                            scientific = FALSE)
 }
 
 # the only thing left is to select() the desired columns
-songs.features <- songs.tidy %>% select(c(1:11, 17, 18))
+songs.features <- songs.tidy %>% select(c(1:11, 17, 18)) 
 songs.features
+
+# export table to csv
+write.csv(songs.features, file = "nevermind-features.csv", row.names = F)
+
 
