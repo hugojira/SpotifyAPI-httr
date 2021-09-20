@@ -1,16 +1,16 @@
-# Author: Hugo Valenzuela
 # ----------------------------------------------------------------
-# This script downloads songs features from the Spotify API given
-# a Spotify ID for the tracks. It's a direct request with HTTP
+# This script downloads audio features from the Spotify API given
+# a Spotify ID for 1-track or an album. It's a direct request with HTTP
 # using the httr package.
 # ----------------------------------------------------------------
 
 
 #installing and loading the required libraries 
 
-library("httr")
+library(httr)
+library(dplyr)
 
-# Authenticate to get the Access Token
+# ---------- Authenticate to get the Access Token ----------
 response <- POST(
   "https://accounts.spotify.com/api/token",
   config = authenticate(user = Sys.getenv("SPOTIFY_ID"), 
@@ -26,11 +26,59 @@ token <-  content(response)
 bearer.token <- paste(token$token_type, token$access_token)
 
 
-# ******** GET requests to retrieve features ********
+# ---------- POST request to retrieve audio features of 1-track -----------
 
 # get features of just  1-track by its Spotify_ID (Santana - Oye Como Va)
-features <- GET("https://api.spotify.com/v1/audio-features/5u6y4u5EgDv0peILf60H5t",
+one.track.features <- GET("https://api.spotify.com/v1/audio-features/5u6y4u5EgDv0peILf60H5t",
                config = add_headers(Authorization = bearer.token)
 )
 
-# get Catalog information about album with Search parameters
+track.tidy <- as_tibble(content( one.track.features ))
+track.tidy %>% select(c(1:11, 17, 18))
+
+# ---------- POST request to retrieve audio features from an album's tracks -----------
+ 
+# first, get the tracks info for an album
+# Nevermind ID: 2guirTSEqLizK7j9i1MTTZ
+
+album.id <- "2guirTSEqLizK7j9i1MTTZ"
+album.response <-  GET(paste0("https://api.spotify.com/v1/albums/", album.id, "/tracks"),
+                          config = add_headers(Authorization = bearer.token)
+)
+
+
+# ---- get tracks' list -----
+album.content <- content(album.response)
+album.songs <- album.content$items
+
+# ----- unlist to get the songs' ids ------
+aux <- unlist(album.songs)
+filter.ids <- aux[ grep("^id$", names(aux)) ]
+album.songs.ids <- cbind( as.character(filter.ids) )
+
+
+# audio features for the tracks of the album
+
+# retrieve features to a list
+album.features <- lapply(1:length(album.songs.ids), function(n) {
+  GET(url = paste0("https://api.spotify.com/v1/audio-features/", album.songs.ids[n]),
+      config = add_headers(authorization = bearer.token))
+}
+)
+
+# get the content of every element in the response list
+album.features.content <- sapply(1:length(album.songs.ids), function(n) {
+  content(album.features[[n]])
+}
+)
+
+# convert lists to tibble and then unlist every column
+songs.tidy <- as_tibble(t(album.features.content))
+for (i in 1:length(songs.tidy)) {
+  songs.tidy[,i] <- unlist( select(.data = songs.tidy, i), use.names = FALSE )
+}
+
+# the only thing left is to select() the desired columns
+songs.features <- songs.tidy %>% select(c(1:11, 17, 18))
+songs.features
+
