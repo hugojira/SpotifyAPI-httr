@@ -38,7 +38,7 @@ track.response <- GET(paste0("https://api.spotify.com/v1/audio-features/",track.
 track <- as_tibble(content( track.response ))
 track.features <- track %>% select(c(1:11, 17, 18))
 
-# ---------- POST request to retrieve audio features from a album -----------
+# ---------- POST request to retrieve audio features from an album -----------
  
 # first, get the tracks info for an album
 # Nevermind ID: 2guirTSEqLizK7j9i1MTTZ
@@ -61,7 +61,7 @@ filter.ids <- aux[ grep("^id$", names(aux)) ]
 album.songs.ids <- cbind( as.character(filter.ids) )
 
 
-# audio features for the tracks of the album
+# ---- audio features for the tracks of the album ----
 
 # retrieve features to a list
 album.features <- lapply(1:length(album.songs.ids), function(i) {
